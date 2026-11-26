@@ -1008,7 +1008,7 @@ function buildSettings(){
   const xm=t=>{ $("#xmsg").textContent=t; };
   $("#tExp").addEventListener("click",()=>{ $("#xfer").style.display="flex"; $("#xcode").value=enc(); xm("このコードを、移したい先の「このコードを読み込む」に貼り付けてね。"); });
   $("#xCopy").addEventListener("click",async()=>{ const t=$("#xcode"); t.select(); try{ await navigator.clipboard.writeText(t.value); xm("コピーしました！"); }catch(e){ document.execCommand&&document.execCommand("copy"); xm("コピーしました（できていなければ、長押しでコピー）"); } });
-  $("#xLoad").addEventListener("click",()=>{ try{ let v=$("#xcode").value.trim(); if(!v.startsWith("TL1:")) throw 0; const j=JSON.parse(decodeURIComponent(escape(atob(v.slice(4))))); const clear={}; for(const k in j.c) clear[k]={d:j.c[k][0],sk:j.c[k][1]}; SAVE={clear,deaths:j.t|0,last:j.l|0}; G.tot=SAVE.deaths; saveAll(); xm("読み込みました！ タイトルに戻ると反映されます。"); }catch(e){ xm("コードが正しくありません。"); } });
+  $("#xLoad").addEventListener("click",()=>{ try{ let v=$("#xcode").value.normalize("NFKC"); const m=v.match(/TL1:([A-Za-z0-9+\/=\s_-]+)/); if(!m) throw "TL1:で始まるコードを貼ってね"; let b=m[1].replace(/\s+/g,"").replace(/-/g,"+").replace(/_/g,"/"); while(b.length%4) b+="="; const j=JSON.parse(decodeURIComponent(escape(atob(b)))); const clear={}; for(const k in j.c) clear[k]={d:j.c[k][0],sk:j.c[k][1]}; SAVE={clear,deaths:j.t|0,last:j.l|0}; G.tot=SAVE.deaths; saveAll(); xm("読み込みました！ タイトルに戻ると反映されます。"); }catch(e){ xm("読み込めませんでした："+(typeof e==="string"?e:"コードが途中で切れているかも。最初の TL1: から最後までぜんぶ貼ってね")); } });
   let arm=0; $("#tReset").addEventListener("click",e=>{ const b=e.target; if(arm){ SAVE={clear:{},deaths:0,last:0}; G.tot=0; saveAll(); arm=0; b.textContent="消去しました"; } else { arm=1; b.textContent="もう一度タップで消去"; setTimeout(()=>{ if(arm){ arm=0; b.textContent="消去する"; } },3000); } });
   updPad();
 }
