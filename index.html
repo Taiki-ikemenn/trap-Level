@@ -994,6 +994,8 @@ function buildSettings(){
     <div class="row"><div>アニメーションを控えめに<small>背景の動き・ステージ切り替え演出などを減らす</small></div>${swHTML("calm")}</div>
   </div>
   <div class="sec"><h3>データ</h3>
+    <div class="row"><div>引き継ぎ<small>ブラウザやアプリを変えるときは、コードを作って移そう</small></div><button type="button" class="danger" style="background:#ffd27a;color:#1b1524;border-color:#ffd27a" id="tExp">コードを作る</button></div>
+    <div class="row" id="xfer" style="display:none;flex-direction:column;align-items:stretch;gap:8px"><textarea id="xcode" rows="4" style="width:100%;box-sizing:border-box;background:#120f19;color:#fff;border:1.5px solid rgba(255,255,255,.25);border-radius:10px;padding:8px;font:12px monospace" placeholder="ここにコードを貼り付け"></textarea><div style="display:flex;gap:8px"><button type="button" class="danger" style="flex:1;background:#ffd27a;color:#1b1524;border-color:#ffd27a" id="xCopy">コピー</button><button type="button" class="danger" style="flex:1" id="xLoad">このコードを読み込む</button></div><small id="xmsg"></small></div>
     <div class="row"><div>セーブデータ<small>クリア状況と失敗回数</small></div><button type="button" class="danger" id="tReset">消去する</button></div>
   </div>`;
   const box=$("#sbox");
@@ -1002,6 +1004,11 @@ function buildSettings(){
   box.querySelectorAll(".seg").forEach(s=>s.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{ SET[s.dataset.k]=+b.dataset.v; saveSet(); applyTouch(); buildSettings(); })));
   box.querySelectorAll("[data-sw]").forEach(b=>b.addEventListener("click",()=>{ const k=b.dataset.sw; SET[k]=!SET[k]; saveSet(); applyTouch(); b.classList.toggle("on",SET[k]); audio(); if(k==="snd"&&SET.snd) SE.coin(); }));
   $("#vol").addEventListener("input",e=>{ SET.vol=e.target.value/100; saveSet(); }); $("#vol").addEventListener("change",()=>{ audio(); SE.coin(); });
+  const enc=()=>{ const c={}; for(const k in SAVE.clear){ const o=SAVE.clear[k]; c[k]=[o.d,o.sk]; } return "TL1:"+btoa(unescape(encodeURIComponent(JSON.stringify({c,t:SAVE.deaths||0,l:SAVE.last||0})))); };
+  const xm=t=>{ $("#xmsg").textContent=t; };
+  $("#tExp").addEventListener("click",()=>{ $("#xfer").style.display="flex"; $("#xcode").value=enc(); xm("このコードを、移したい先の「このコードを読み込む」に貼り付けてね。"); });
+  $("#xCopy").addEventListener("click",async()=>{ const t=$("#xcode"); t.select(); try{ await navigator.clipboard.writeText(t.value); xm("コピーしました！"); }catch(e){ document.execCommand&&document.execCommand("copy"); xm("コピーしました（できていなければ、長押しでコピー）"); } });
+  $("#xLoad").addEventListener("click",()=>{ try{ let v=$("#xcode").value.trim(); if(!v.startsWith("TL1:")) throw 0; const j=JSON.parse(decodeURIComponent(escape(atob(v.slice(4))))); const clear={}; for(const k in j.c) clear[k]={d:j.c[k][0],sk:j.c[k][1]}; SAVE={clear,deaths:j.t|0,last:j.l|0}; G.tot=SAVE.deaths; saveAll(); xm("読み込みました！ タイトルに戻ると反映されます。"); }catch(e){ xm("コードが正しくありません。"); } });
   let arm=0; $("#tReset").addEventListener("click",e=>{ const b=e.target; if(arm){ SAVE={clear:{},deaths:0,last:0}; G.tot=0; saveAll(); arm=0; b.textContent="消去しました"; } else { arm=1; b.textContent="もう一度タップで消去"; setTimeout(()=>{ if(arm){ arm=0; b.textContent="消去する"; } },3000); } });
   updPad();
 }
