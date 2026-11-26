@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="トラップ レベル">
+<meta name="theme-color" content="#14121a">
+<title>トラップ レベル | Trap Level</title>
+<style>
+:root{--bg:#14121a;--ink:#f4efe6;--mute:#9b94a8;--line:#3a3646;--acc:#ff9f43;--red:#e8443a;--sans:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);overflow:hidden;touch-action:none;overscroll-behavior:none}
+#wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+canvas{display:block;background:#000;image-rendering:auto}
+button{font-family:inherit;cursor:pointer}
+/* HUD */
+#hud{position:fixed;left:0;right:0;top:0;display:none;align-items:center;gap:8px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;pointer-events:none;z-index:5}
+#hud.on{display:flex}
+#hud .lv{font:900 17px var(--sans);color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.45);letter-spacing:.06em}
+#hud .lv small{font-weight:700;opacity:.85;margin-left:8px;font-size:13px}
+#hud .ms{font:700 14px var(--sans);color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.45)}
+#hud .sp{flex:1}
+.hb{pointer-events:auto;border:2px solid rgba(255,255,255,.7);background:rgba(20,18,26,.55);color:#fff;font:800 13px var(--sans);padding:7px 12px;border-radius:8px}
+.hb:active{transform:scale(.95)}
+#hintBar{position:fixed;left:50%;bottom:calc(120px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:min(720px,92vw);background:rgba(20,18,26,.88);border:2px solid var(--acc);color:#fff;padding:10px 16px;border-radius:10px;font:700 15px/1.6 var(--sans);display:none;z-index:6;text-align:center}
+#hintBar.on{display:block}
+/* touch */
+#touch{position:fixed;left:0;right:0;bottom:0;display:none;justify-content:space-between;align-items:flex-end;padding:0 calc(18px + env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));pointer-events:none;z-index:7}
+#touch.on{display:flex}
+#touch .g{display:flex;gap:14px;pointer-events:auto}
+.tb{width:96px;height:96px;border-radius:50%;border:3px solid rgba(255,255,255,.75);background:rgba(20,18,26,.5);display:flex;align-items:center;justify-content:center;touch-action:none}
+.tb.on{background:rgba(255,159,67,.65)}
+.tb svg{width:44px;height:44px;fill:#fff;pointer-events:none}
+/* screens */
+.screen{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;padding:20px;z-index:20;background:radial-gradient(70rem 40rem at 50% 10%,#2a2438,#0f0d14);overflow:auto;touch-action:pan-y}
+.screen.on{display:flex}
+.logo{font:900 clamp(40px,9vw,92px)/1.05 var(--sans);letter-spacing:.04em;text-align:center;margin:0}
+.logo span{color:var(--acc)}
+.logo2{font:800 clamp(14px,2.6vw,22px) var(--sans);letter-spacing:.5em;color:var(--mute);text-align:center;margin:10px 0 26px}
+.spk{display:flex;justify-content:center;margin:18px 0 8px}
+.spk svg{width:40px;height:26px;fill:var(--ink)}
+.btn{border:3px solid var(--ink);background:var(--ink);color:#14121a;padding:14px 38px;font:900 20px var(--sans);letter-spacing:.2em;border-radius:10px;margin:6px;min-width:260px;transition:transform .12s}
+.btn:active{transform:scale(.96)}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line);font-size:16px;padding:11px 26px;min-width:200px}
+.btn.acc{background:var(--acc);border-color:var(--acc)}
+.col{display:flex;flex-direction:column;align-items:center}
+.ver{font:500 12px ui-monospace,monospace;color:var(--mute);margin-top:18px;text-align:center}
+h2{font:900 26px var(--sans);margin:0 0 6px;text-align:center;letter-spacing:.1em}
+.sub{color:var(--mute);font-size:14px;margin:0 0 18px;text-align:center}
+.wgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;width:min(900px,100%)}
+@media(max-width:760px){.wgrid{grid-template-columns:repeat(2,1fr)}}
+.wc{border:3px solid rgba(0,0,0,.35);border-radius:14px;padding:12px 10px 10px;color:#fff;text-align:center;position:relative;box-shadow:0 6px 0 rgba(0,0,0,.35);transition:transform .12s}
+.wc:active{transform:translateY(3px);box-shadow:0 3px 0 rgba(0,0,0,.35)}
+.wc svg{width:54px;height:72px;display:block;margin:0 auto 6px}
+.wc b{display:block;font:900 15px var(--sans);text-shadow:0 2px 0 rgba(0,0,0,.35)}
+.wc i{display:block;font:700 12px ui-monospace,monospace;font-style:normal;margin-top:4px;opacity:.95}
+.wc .dots{display:flex;gap:4px;justify-content:center;margin-top:6px}
+.wc .dots u{width:12px;height:12px;border-radius:50%;background:rgba(0,0,0,.35);display:block}
+.wc .dots u.d{background:#fff}.wc .dots u.s{background:#ffd27a}
+.stl{display:flex;flex-direction:column;gap:8px;width:min(520px,100%)}
+.st{display:flex;align-items:center;gap:12px;padding:12px 16px;border:2px solid var(--line);background:rgba(255,255,255,.04);color:var(--ink);border-radius:10px;text-align:left;font:800 17px var(--sans)}
+.st:active{transform:scale(.98)}
+.st em{font:900 15px ui-monospace,monospace;font-style:normal;color:var(--acc);min-width:34px}
+.st span{flex:1}.st small{color:var(--mute);font-size:12px}
+.st.done{border-color:#58c27d}
+.tg{display:flex;align-items:center;justify-content:space-between;width:min(420px,100%);padding:14px 16px;border:2px solid var(--line);border-radius:10px;margin:6px 0;font:800 16px var(--sans);color:var(--ink);background:transparent}
+.tg b{font:900 14px var(--sans);padding:4px 12px;border-radius:20px;background:#58c27d;color:#10281a}.tg b.off{background:#4a4556;color:#cfc9d8}
+.banner{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%) scale(.9);background:rgba(20,18,26,.92);border:3px solid var(--acc);padding:16px 30px;border-radius:14px;font:900 28px var(--sans);letter-spacing:.12em;z-index:15;opacity:0;pointer-events:none;transition:all .25s;text-align:center}
+.banner.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv"></canvas></div>
+
+<div id="hud">
+  <div class="lv" id="hLv"></div><div class="ms" id="hMs"></div><div class="sp"></div>
+  <button class="hb" id="hHint" style="display:none">ヒント</button>
+  <button class="hb" id="hSkip" style="display:none">スキップ</button>
+  <button class="hb" id="hRe">やり直し</button>
+  <button class="hb" id="hMenu">メニュー</button>
+</div>
+<div id="hintBar"></div>
+<div class="banner" id="banner"></div>
+
+<div id="touch">
+  <div class="g">
+    <button class="tb" id="bL" aria-label="左"><svg viewBox="0 0 24 24"><path d="M15 4L6 12l9 8z"/></svg></button>
+    <button class="tb" id="bR" aria-label="右"><svg viewBox="0 0 24 24"><path d="M9 4l9 8-9 8z"/></svg></button>
+  </div>
+  <div class="g"><button class="tb" id="bJ" aria-label="ジャンプ" style="width:112px;height:112px"><svg viewBox="0 0 24 24"><path d="M12 3l9 12h-6v6H9v-6H3z"/></svg></button></div>
+</div>
+
+<section class="screen on" id="title">
+  <div class="spk" id="spk"></div>
+  <h1 class="logo">トラップ<span>レベル</span></h1>
+  <div class="logo2">TRAP LEVEL</div>
+  <div class="col">
+    <button class="btn acc" id="bPlay">あそぶ</button>
+    <button class="btn" id="bWorlds">ステージえらび</button>
+    <button class="btn ghost" id="bSet">せってい</button>
+  </div>
+  <div class="ver" id="ver">v1.0.0　全50ステージ</div>
+</section>
+
+<section class="screen" id="worlds">
+  <h2>ワールドをえらぶ</h2>
+  <p class="sub" id="wSub"></p>
+  <div class="wgrid" id="wgrid"></div>
+  <button class="btn ghost" id="wBack" style="margin-top:18px">戻る</button>
+</section>
+
+<section class="screen" id="stages">
+  <h2 id="sTitle"></h2>
+  <p class="sub" id="sSub"></p>
+  <div class="stl" id="stl"></div>
+  <button class="btn ghost" id="sBack" style="margin-top:18px">戻る</button>
+</section>
+
+<section class="screen" id="settings">
+  <h2>せってい</h2>
+  <p class="sub">操作：← → / A D で移動、↑ / W / スペースでジャンプ、Rでやり直し</p>
+  <button class="tg" id="tSnd"><span>効果音</span><b id="tSndV"></b></button>
+  <button class="tg" id="tShk"><span>画面のゆれ（ゆれが苦手ならOFF）</span><b id="tShkV"></b></button>
+  <button class="tg" id="tTouch"><span>画面のボタン（タッチ操作）</span><b id="tTouchV"></b></button>
+  <button class="tg" id="tReset"><span>セーブデータを消す</span><b class="off" id="tResetV">消す</b></button>
+  <button class="btn ghost" id="setBack" style="margin-top:14px">戻る</button>
+</section>
+
+<section class="screen" id="ending">
+  <h2 style="font-size:34px">ぜんぶクリア！</h2>
+  <p class="sub" id="endTxt" style="font-size:16px;line-height:1.9"></p>
+  <button class="btn acc" id="endBack">ステージえらび</button>
+</section>
+
+<script>
+(()=>{"use strict";
+const TS=30,GW=32,GH=18,W=960,H=540;
+const $=s=>document.querySelector(s);
+const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const WORLDS=[
+ {n:"ゆか",bg:"#e98b3f",wall:"#2b1c14",ac:"#ffd27a"},
+ {n:"トゲ",bg:"#8a5bd0",wall:"#201533",ac:"#e6d3ff"},
+ {n:"うごく",bg:"#3fa66b",wall:"#12291d",ac:"#c6f2d4"},
+ {n:"バネ",bg:"#3b8fd6",wall:"#112338",ac:"#bfe0ff"},
+ {n:"にせドア",bg:"#d65a7a",wall:"#35131e",ac:"#ffd0dc"},
+ {n:"カギ",bg:"#c9a227",wall:"#2c2408",ac:"#fff0b3"},
+ {n:"さかさま",bg:"#2fb5b0",wall:"#0f2b2a",ac:"#bff5f2"},
+ {n:"くらやみ",bg:"#5b6bd6",wall:"#14173a",ac:"#d0d6ff"},
+ {n:"こおり",bg:"#7fb8d9",wall:"#17303f",ac:"#e6f6ff"},
+ {n:"さいご",bg:"#d6453d",wall:"#2e0f0d",ac:"#ffd2cc"}];
+
+/* ================= 音 ================= */
+let SET=Object.assign({snd:true,shk:true,touch:null},store.get("tl_set",{}));
+let AC=null;
+function audio(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==="suspended") AC.resume(); }
+function tone(f,d,type,v,s){ if(!SET.snd||!AC) return; const t=AC.currentTime+(s||0); const o=AC.createOscillator(),g=AC.createGain(); o.type=type||"square"; o.frequency.setValueAtTime(f,t); g.gain.setValueAtTime(v||.05,t); g.gain.exponentialRampToValueAtTime(.0001,t+d); o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t+d+.02); }
+const SE={jump(){tone(420,.1,"square",.04);tone(640,.08,"square",.03,.05)},die(){tone(200,.22,"sawtooth",.07);tone(95,.35,"sawtooth",.06,.08)},win(){[523,659,784,1046].forEach((f,i)=>tone(f,.2,"square",.05,i*.09))},tick(){tone(260,.05,"square",.025)},coin(){tone(900,.07,"square",.04);tone(1300,.1,"square",.04,.06)},spring(){tone(300,.22,"triangle",.06);tone(620,.18,"triangle",.05,.05)},key(){[700,900,1200].forEach((f,i)=>tone(f,.09,"square",.04,i*.06))}};
+
+/* ================= ステージ生成 ================= */
+class Bld{
+  constructor(){ this.g=Array.from({length:GH},()=>Array(GW).fill(".")); this.defs={}; this.traps=[]; this.start=[2,14]; this.door=null; this.init={}; }
+  r(x1,y1,x2,y2,c){ c=c||"#"; for(let y=y1;y<=y2;y++)for(let x=x1;x<=x2;x++)this.g[y][x]=c; }
+  p(x,y,c){ this.g[y][x]=c||"#"; }
+  s(x,y){ this.start=[x,y===undefined?14:y]; }
+  d(x,y){ if(this.door) this.g[this.door[1]][this.door[0]]="."; this.door=[x,y===undefined?14:y]; this.g[this.door[1]][this.door[0]]="D"; }
+  def(c,o){ this.defs[c]=o; }
+  t(when,...acts){ this.traps.push({w:when,a:acts}); }
+  cr(chars,dl){ for(const c of chars) this.t({on:c,dl:dl},["fall",c]); }
+}
+const LV=[];
+function Lv(w,n,h,f){ LV.push({w,n,h,f}); }
+const DEF={"^":{k:"spike",d:"u"},"v":{k:"spike",d:"d"},"<":{k:"spike",d:"l"},">":{k:"spike",d:"r"},K:{k:"key"},C:{k:"coin"},J:{k:"spring"},D:{k:"door"},F:{k:"door",fake:true}};
+function baseLv(B){ B.r(0,0,31,0); B.r(0,0,0,17); B.r(31,0,31,17); B.r(0,15,31,17); B.d(29); }
+function build(i){
+  const d=LV[i],B=new Bld(); baseLv(B); d.f(B);
+  const solid=new Uint8Array(GW*GH),G={},gl=[];
+  for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){
+    const c=B.g[y][x]; if(c==="."||c===" ") continue;
+    if(c==="#"){ solid[y*GW+x]=1; continue; } if(c==="~"){ solid[y*GW+x]=2; continue; }
+    if(!G[c]){ const o=Object.assign({},DEF[c]||{k:"block"},B.defs[c]||{}); const k=o.k;
+      G[c]={ch:c,k,d:o.d||"u",fake:!!o.fake,cells:[],vis0:o.vis!==false,solid0:o.solid!==undefined?o.solid:k==="block",haz0:o.haz!==undefined?o.haz:k==="spike",ox0:o.ox||0,oy0:o.oy||0,osc:o.osc||null,col:o.col||""}; gl.push(c); }
+    G[c].cells.push([x,y]); (G[c].set=G[c].set||new Set()).add(x+","+y);
+  }
+  const needKey=gl.some(c=>G[c].k==="key"&&!G[c].fake);
+  const timed=B.traps.some(t=>t.w.e||t.w.t!==undefined)||gl.some(c=>G[c].osc);
+  return {i,w:d.w,n:d.n,h:d.h,solid,G,gl,traps:B.traps,start:B.start,needKey,init:B.init,timed};
+}
+function newState(L){
+  const ini=L.init||{},g=ini.g||1,w=20,h=26;
+  const p={x:L.start[0]*TS+5,y:g>0?(L.start[1]+1)*TS-h:L.start[1]*TS,w,h,vx:0,vy:0,g,on:false,onCh:"",face:1};
+  const gs={};
+  for(const ch of L.gl){ const G=L.G[ch]; gs[ch]={vis:G.vis0,solid:G.solid0,haz:G.haz0,bx:G.ox0,by:G.oy0,ox:G.ox0,oy:G.oy0,vx:0,vy:0,tw:null,fall:false,sl:0,osc:G.osc?{ax:G.osc[0],ay:G.osc[1],per:G.osc[2],t0:G.osc[3]||0}:null,got:false,anim:0}; }
+  return {f:0,p,g:gs,tp:L.traps.map(()=>-1),td:L.traps.map(()=>0),at:{},key:false,ctl:ini.ctl||1,flip:!!ini.flip,dark:!!ini.dark,wind:ini.wind||0,ice:!!ini.ice,k:1,jc:0,jb:0,jh:false,coy:0,sc:0,st:"",why:"",msg:"",mt:0,shk:0,kt:0,cj:false};
+}
+
+/* ================= 物理 ================= */
+const SP=3.3,GR=.52,JV=10.6,MAXF=11,SPRING=16.5;
+const ov=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+function solidsAt(L,S,qx,qy,qw,qh){
+  const out=[]; const x0=Math.max(0,Math.floor(qx/TS)),x1=Math.min(GW-1,Math.floor((qx+qw)/TS)),y0=Math.max(0,Math.floor(qy/TS)),y1=Math.min(GH-1,Math.floor((qy+qh)/TS));
+  for(let ty=y0;ty<=y1;ty++)for(let tx=x0;tx<=x1;tx++){ const s=L.solid[ty*GW+tx]; if(s) out.push({x:tx*TS,y:ty*TS,w:TS,h:TS,ice:s===2,ch:""}); }
+  for(const ch of L.gl){ const g=S.g[ch]; if(!g.vis||!g.solid) continue; for(const c of L.G[ch].cells){ const rx=c[0]*TS+g.ox,ry=c[1]*TS+g.oy; if(rx<qx+qw&&rx+TS>qx&&ry<qy+qh&&ry+TS>qy) out.push({x:rx,y:ry,w:TS,h:TS,ice:false,ch}); } }
+  return out;
+}
+function die(S,why){ if(!S.st){ S.st="dead"; S.why=why; } }
+function setScale(S,k){ const p=S.p; const nh=26*k,nw=20*k; if(p.g>0) p.y+=p.h-nh; p.x+=(p.w-nw)/2; p.w=nw; p.h=nh; S.k=k; }
+function act(L,S,a){
+  const g=a[1]&&S.g[a[1]];
+  switch(a[0]){
+    case "show": if(g) g.vis=true; break;
+    case "hide": if(g) g.vis=false; break;
+    case "swap": if(g) g.vis=!g.vis; break;
+    case "solid": if(g) g.solid=a[2]; break;
+    case "haz": if(g) g.haz=a[2]; break;
+    case "move": if(g) g.tw={sx:g.bx,sy:g.by,dx:a[2]*TS,dy:a[3]*TS,T:a[4],t:0}; break;
+    case "slide": if(g){ g.vx=a[2]; g.vy=a[3]; g.sl=a[4]||0; } break;
+    case "fall": if(g) g.fall=true; break;
+    case "grav": S.p.g*=-1; S.p.on=false; break;
+    case "ctl": S.ctl*=-1; break;
+    case "scale": setScale(S,a[1]); break;
+    case "dark": S.dark=a[1]; break;
+    case "flip": S.flip=!S.flip; break;
+    case "wind": S.wind=a[1]; break;
+    case "ice": S.ice=a[1]; break;
+    case "kill": die(S,"trap"); break;
+    case "msg": S.msg=a[1]; S.mt=150; break;
+    case "shake": S.shk=a[1]||14; break;
+  }
+}
+function cond(L,S,w){
+  const p=S.p;
+  if(w.z){ const z=w.z; return p.x<(z[2]+1)*TS&&p.x+p.w>z[0]*TS&&p.y<(z[3]+1)*TS&&p.y+p.h>z[1]*TS; }
+  if(w.t!==undefined) return S.f>=w.t;
+  if(w.af) return S.at[w.af[0]]!==undefined&&S.f>=S.at[w.af[0]]+w.af[1];
+  if(w.on) return p.onCh===w.on;
+  if(w.touch){ const g=S.g[w.touch]; if(!g||!g.vis) return false; for(const c of L.G[w.touch].cells){ if(ov(p,{x:c[0]*TS+g.ox,y:c[1]*TS+g.oy,w:TS,h:TS})) return true; } return false; }
+  if(w.get) return S.g[w.get].got;
+  if(w.j) return S.jc>=w.j;
+  return false;
+}
+function runTraps(L,S){
+  for(let i=0;i<L.traps.length;i++){
+    const T=L.traps[i],w=T.w;
+    if(w.e){ if(S.f>=w.e[0]&&(S.f-w.e[0])%w.e[1]===0){ for(const a of T.a) act(L,S,a); } continue; }
+    if(S.td[i]) continue;
+    if(S.tp[i]<0&&cond(L,S,w)) S.tp[i]=S.f+(w.dl||0);
+    if(S.tp[i]>=0&&S.f>=S.tp[i]){ S.td[i]=1; if(w.id) S.at[w.id]=S.f; for(const a of T.a) act(L,S,a); S.tk=S.f; }
+  }
+}
+function groupsStep(L,S){
+  const p=S.p;
+  for(const ch of L.gl){
+    const g=S.g[ch]; const ox0=g.ox,oy0=g.oy;
+    if(g.tw){ const t=g.tw; t.t++; g.bx=t.sx+t.dx*t.t/t.T; g.by=t.sy+t.dy*t.t/t.T; if(t.t>=t.T) g.tw=null; }
+    if(g.vx||g.vy){ g.bx+=g.vx; g.by+=g.vy; if(g.sl>0){ g.sl--; if(g.sl===0){ g.vx=0; g.vy=0; } } }
+    if(g.fall){ g.vy+=.6; if(g.vy>14) g.vy=14; g.by+=g.vy; if(g.by>760){ g.vis=false; g.fall=false; g.vy=0; } }
+    let ax=0,ay=0; if(g.osc){ const o=g.osc; if(S.f>=o.t0){ const k=(1-Math.cos(2*Math.PI*(S.f-o.t0)/o.per))/2; ax=o.ax*TS*k; ay=o.ay*TS*k; } }
+    g.ox=g.bx+ax; g.oy=g.by+ay; if(g.anim>0) g.anim--;
+    const dx=g.ox-ox0,dy=g.oy-oy0;
+    if(!g.vis||!g.solid||(dx===0&&dy===0)) continue;
+    let riding=false;
+    for(const c of L.G[ch].cells){ const rx=c[0]*TS+ox0,ry=c[1]*TS+oy0;
+      if(p.g>0&&Math.abs(p.y+p.h-ry)<=2.5&&p.x+p.w>rx+1&&p.x<rx+TS-1){ riding=true; break; } }
+    if(riding){ p.x+=dx; p.y+=dy; continue; }
+    for(const c of L.G[ch].cells){ const r={x:c[0]*TS+g.ox,y:c[1]*TS+g.oy,w:TS,h:TS};
+      if(ov(p,r)){ if(Math.abs(dy)>=Math.abs(dx)){ if(dy>0) p.y=r.y+r.h; else p.y=r.y-p.h; } else { if(dx>0) p.x=r.x+r.w; else p.x=r.x-p.w; }
+        const rs=solidsAt(L,S,p.x,p.y,p.w,p.h); for(const q of rs){ if(q.ch!==ch&&ov(p,q)){ die(S,"crush"); break; } } } }
+  }
+}
+function step(L,S,inp){
+  if(S.st) return;
+  S.f++; const p=S.p;
+  runTraps(L,S); groupsStep(L,S); if(S.st) return;
+  if(S.mt>0) S.mt--; if(S.shk>0) S.shk--;
+  // 入力
+  const dir=((inp.r?1:0)-(inp.l?1:0))*S.ctl;
+  if(inp.j&&!S.jh) S.jb=7; S.jh=!!inp.j; if(S.jb>0) S.jb--;
+  const tv=dir*SP;
+  if(S.ice){ p.vx+=(tv-p.vx)*(p.on?.04:.1); } else p.vx=tv;
+  if(dir!==0) p.face=dir>0?1:-1;
+  // x
+  const mx=p.vx+S.wind; p.x+=mx;
+  { const rs=solidsAt(L,S,p.x,p.y,p.w,p.h); for(const r of rs){ if(!ov(p,r)) continue; if(mx>0) p.x=r.x-p.w; else if(mx<0) p.x=r.x+r.w; else{ if(p.x+p.w/2<r.x+r.w/2) p.x=r.x-p.w; else p.x=r.x+r.w; } p.vx=0; } }
+  // jump
+  if(S.coy>0) S.coy--;
+  if(S.jb>0&&S.coy>0){ p.vy=-JV*p.g; S.coy=0; S.jb=0; S.jc++; S.sj=S.f; S.cj=true; }
+  if(S.cj&&!S.jh&&p.vy*p.g<-3.4) p.vy=-3.4*p.g;
+  // y
+  p.vy+=GR*p.g; if(p.vy*p.g>MAXF) p.vy=MAXF*p.g;
+  p.y+=p.vy; p.on=false; p.onCh="";
+  { const rs=solidsAt(L,S,p.x,p.y,p.w,p.h); for(const r of rs){ if(!ov(p,r)) continue;
+      if(p.vy*p.g>0){ p.y=p.g>0?r.y-p.h:r.y+r.h; p.vy=0; p.on=true; p.onCh=r.ch; p.ice=r.ice; }
+      else { p.y=p.g>0?r.y+r.h:r.y-p.h; p.vy=0; } } }
+  if(p.on){ S.coy=6; S.cj=false; }
+  // 範囲外
+  if(p.y>H+30||p.y<-90||p.x<-40||p.x>W+40){ die(S,"fall"); return; }
+  if(S.sc>0) S.sc--;
+  // 危険・取得・扉
+  const pr={x:p.x+2,y:p.y+2,w:p.w-4,h:p.h-4};
+  for(const ch of L.gl){ const G=L.G[ch],g=S.g[ch]; if(!g.vis) continue;
+    for(const c of G.cells){ const x=c[0]*TS+g.ox,y=c[1]*TS+g.oy;
+      if(g.haz){ let r; if(G.k==="spike"){ r=G.d==="u"?{x:x+5,y:y+8,w:20,h:22}:G.d==="d"?{x:x+5,y:y,w:20,h:22}:G.d==="l"?{x:x,y:y+5,w:22,h:20}:{x:x+8,y:y+5,w:22,h:20}; if(ov(pr,r)){ die(S,"spike"); return; } }
+        else { r={x:x-1.5,y:y-1.5,w:TS+3,h:TS+3}; if(ov({x:p.x,y:p.y,w:p.w,h:p.h},r)){ die(S,"hit"); return; } } }
+      if(G.k==="spring"){ if(S.sc<=0&&ov(p,{x:x+2,y:y+14,w:26,h:16})){ p.vy=-SPRING*p.g; S.cj=false; S.sc=10; g.anim=10; S.sp=S.f; } }
+      else if(G.k==="key"||G.k==="coin"){ if(ov(p,{x:x+4,y:y+4,w:22,h:22})){ g.vis=false; g.got=true; if(G.k==="key"&&!G.fake) S.key=true; S.pk=G.k; break; } }
+      else if(G.k==="door"){ if(ov(p,{x:x+4,y:y-14,w:22,h:44+(p.g<0?14:0)})){ if(G.fake){ die(S,"fake"); return; } if(L.needKey&&!S.key){ if(S.mt<=0){ S.msg="カギがないと、あかない"; S.mt=70; } } else { S.st="win"; return; } } }
+    } }
+}
+
+/* ================= ステージ定義 ================= */
+const gHole=(B,x,w,ch)=>{ B.r(x,15,x+w-1,17,ch); B.t({z:[x-3,1,x-2,14]},["hide",ch]); };
+const gCeil=(B,x,ch)=>{ B.def(ch,{k:"spike",d:"d"}); B.p(x,1,ch); B.t({z:[x-3,1,x-2,14]},["move",ch,0,13,14]); };
+const gPop=(B,x,w,ch,z0)=>{ B.def(ch,{k:"spike",d:"u",vis:false}); B.r(x,14,x+w-1,14,ch); B.t({z:[z0,1,z0+1,14]},["show",ch]); };
+const gSp=(B,x,w)=>B.r(x,14,x+w-1,14,"^");
+
+/* ---- ワールド1: ゆか ---- */
+Lv(1,"ふつうの道","止まらずに進んでみよう。床がなくなったら、ジャンプ！",B=>{
+  gHole(B,12,3,"a");
+});
+Lv(1,"ふたつ目","ひとつ目を越えても、安心しない。",B=>{
+  gHole(B,9,2,"a"); gHole(B,17,3,"b");
+});
+Lv(1,"のってはいけない足場","立ち止まると落ちる。足場は止まらずに駆け抜けよう。",B=>{
+  B.r(7,15,22,17,"."); const ch="abcdefghijklmnop"; for(let i=0;i<16;i++) B.p(7+i,14,ch[i]); B.cr(ch,12);
+});
+Lv(1,"ジャンプしたら","ジャンプした瞬間に、床が消える。かべの上から飛んでみよう。",B=>{
+  B.r(11,12,11,14,"#"); B.r(12,15,15,17,"a"); B.t({j:1,dl:4},["hide","a"]);
+});
+Lv(1,"見えない足場","なにもない所にも、足場があるかもしれない。",B=>{
+  B.r(6,15,25,17,"."); B.r(8,13,9,13,"#"); B.def("b",{vis:false}); B.r(13,12,14,12,"b"); B.def("c",{vis:false}); B.r(18,13,19,13,"c"); B.r(22,12,23,12,"#");
+  B.t({z:[10,1,12,14]},["show","b"]); B.t({on:"b"},["show","c"]);
+});
+
+/* ---- ワールド2: トゲ ---- */
+Lv(2,"天井から","上にも気をつけよう。落ちたトゲは、そのまま残る。",B=>{
+  gCeil(B,13,"a");
+});
+Lv(2,"高いかべのむこう","ジャンプすると、むこうにトゲが生える。",B=>{
+  B.r(10,13,10,14,"#"); B.def("a",{k:"spike",d:"u",vis:false}); B.r(11,14,13,14,"a"); B.t({j:1},["show","a"]);
+  B.r(20,13,20,14,"#"); B.def("b",{k:"spike",d:"u",vis:false}); B.r(21,14,23,14,"b"); B.t({j:2},["show","b"]);
+});
+Lv(2,"ふいうちトゲ","トゲは出たり、ひっこんだり。タイミングをはかろう。",B=>{
+  [[8,"a",20],[12,"b",50],[16,"c",80],[20,"d",110]].forEach(([x,ch,s])=>{ B.def(ch,{k:"spike",d:"u",vis:false}); B.p(x,14,ch); B.t({e:[s,90]},["swap",ch]); });
+});
+Lv(2,"トゲのあめ","落ちてきたトゲは、地面にささったまま。ジャンプでこえよう。",B=>{
+  [9,13,17,21,25].forEach((x,i)=>gCeil(B,x,"abcde"[i]));
+});
+Lv(2,"トゲの丘","丘の上にも、トゲが待っている。",B=>{
+  gCeil(B,11,"a"); B.p(14,14); B.r(15,13,18,14); B.p(19,14);
+  B.def("b",{k:"spike",d:"u",vis:false}); B.r(16,12,17,12,"b"); B.t({z:[13,1,14,14]},["show","b"]);
+  gPop(B,23,2,"c",20);
+});
+
+/* ---- ワールド3: うごく ---- */
+Lv(3,"のるだけ","動く足場に乗って、むこうへ。",B=>{
+  B.r(7,15,23,17,"."); B.def("a",{k:"block",osc:[14,0,420]}); B.r(7,15,8,15,"a");
+});
+Lv(3,"プレス","天井が落ちてくる。通りぬけるタイミングは？",B=>{
+  B.def("a",{k:"block",haz:true,osc:[0,12,170]}); B.r(15,1,16,2,"a");
+  B.def("b",{k:"block",haz:true,osc:[0,12,170,-85]}); B.r(22,1,23,2,"b");
+});
+Lv(3,"せまるかべ","うしろから、かべが来る。止まったらおしまい。",B=>{
+  B.s(4); B.def("a",{k:"block",haz:true}); B.r(1,1,1,14,"a"); B.t({z:[6,1,7,14]},["slide","a",1.5,0]);
+  gSp(B,12,1); gSp(B,18,1); gSp(B,24,1);
+});
+Lv(3,"エレベーター","乗ると動く足場。上まで行ってみよう。",B=>{
+  B.def("a",{k:"block"}); B.r(10,14,11,14,"a"); B.t({on:"a"},["move","a",0,-9,180]);
+  B.r(13,5,20,5,"#"); B.def("b",{k:"spike",d:"u",vis:false}); B.r(15,4,16,4,"b"); B.t({on:"a",dl:120},["show","b"]);
+});
+Lv(3,"なんでもあり","動く足場、プレス、せまるかべ。ぜんぶ入り。",B=>{
+  B.r(9,15,13,17,"."); B.def("a",{k:"block",osc:[5,0,200]}); B.r(9,15,10,15,"a");
+  B.def("b",{k:"block",haz:true,osc:[0,12,150]}); B.r(19,1,20,2,"b");
+  B.def("c",{k:"block",haz:true,vis:false}); B.r(16,1,16,14,"c"); B.t({z:[22,1,23,14]},["show","c"],["slide","c",2.2,0]);
+});
+
+/* ---- ワールド4: バネ ---- */
+Lv(4,"高く飛びすぎ","バネは高く飛ぶ。真上にトゲがあるなら、横に動きながら。",B=>{
+  B.d(29,6); B.r(13,7,30,7); B.p(10,14,"J"); B.r(9,6,10,6,"v");
+});
+Lv(4,"おいかけるバネ","バネが近づいてくる。ふまれたら、天井のトゲに。",B=>{
+  B.r(12,6,30,6,"v"); B.p(26,14,"J"); B.def("J",{k:"spring"}); B.t({z:[8,1,9,14]},["slide","J",-1.4,0]);
+});
+Lv(4,"バネの橋","バネからバネへ。空中でも動ける。",B=>{
+  B.r(7,15,26,17,"."); [9,15,21].forEach(x=>{ B.r(x,15,x,17,"#"); B.p(x,14,"J"); });
+});
+Lv(4,"くずれるたな","バネで上のたなへ。たなはくずれる。",B=>{
+  B.p(8,14,"J"); B.r(11,7,14,7,"#"); for(let i=0;i<4;i++){ B.p(12+i,7,"abcd"[i]); } B.p(11,7,"#"); B.cr("abcd",20); B.r(18,7,21,7,"#");
+});
+Lv(4,"てっぺん","てっぺんまで、バネでのぼろう。",B=>{
+  B.d(29,2); B.p(6,14,"J"); B.r(9,7,12,7); B.p(12,6,"J"); B.r(13,3,30,3);
+  for(let i=0;i<5;i++){ B.p(21+i,3,"abcde"[i]); } B.cr("abcde",14);
+});
+
+/* ---- ワールド5: にせドア ---- */
+Lv(5,"ドアがふたつ","手前のドアは、本物かな？",B=>{
+  B.p(14,14,"F"); B.p(20,14,"^");
+});
+Lv(5,"にげるドア","ドアが逃げる。追いかけよう。",B=>{
+  B.d(14); B.t({z:[10,1,11,14]},["slide","D",2.6,0,100]);
+});
+Lv(5,"とっしんドア","ドアが走ってくる！",B=>{
+  B.p(22,14,"F"); B.t({z:[8,1,9,14]},["slide","F",-3.8,0]);
+});
+Lv(5,"高いところ","いちばん目立つドアが、出口とはかぎらない。",B=>{
+  B.p(28,14,"F"); B.p(18,14); B.r(19,13,19,14); B.r(20,12,20,14); B.r(22,9,30,9); B.d(29,8);
+});
+Lv(5,"ほんものは？","出口は、意外とすぐそばにある。",B=>{
+  B.s(5); B.d(1); B.p(26,14,"F"); B.p(15,14,"F"); B.t({z:[9,1,10,14]},["slide","F",-3.4,0]);
+});
+
+/* ---- ワールド6: カギ ---- */
+Lv(6,"カギをとって","まずカギ。ドアはカギがないとあかない。",B=>{
+  B.r(19,12,21,12); B.p(20,11,"K");
+});
+Lv(6,"コインはおとり","コインをとると、足場が落ちはじめる。",B=>{
+  B.r(13,12,17,12); for(let i=0;i<5;i++) B.p(13+i,12,"abcde"[i]); B.p(14,11,"C"); B.p(15,11,"C"); B.p(17,11,"K");
+  B.r(13,14,17,14,"^"); B.t({get:"C",dl:25},["fall","a"],["fall","b"],["fall","c"],["fall","d"],["fall","e"]);
+});
+Lv(6,"にげるカギ","カギが逃げる。追いつめよう。",B=>{
+  B.p(22,14,"K"); B.t({z:[14,1,16,14]},["slide","K",3,0,60]);
+});
+Lv(6,"にせカギ","目立つカギは、ワナかもしれない。",B=>{
+  B.def("a",{k:"key",fake:true}); B.p(15,14,"a"); B.p(1,14,"K");
+  B.def("b",{k:"spike",d:"d"}); B.r(12,1,22,1,"b"); B.t({get:"a",dl:40},["fall","b"]);
+});
+Lv(6,"高いカギ","カギは高いところ。ドアは、はんたいがわ。",B=>{
+  B.s(29); B.d(2); B.p(23,14); B.r(22,13,22,14); B.r(21,12,21,14);
+  B.r(17,9,20,9); B.p(20,8,"K");
+});
+
+/* ---- ワールド7: さかさま ---- */
+Lv(7,"うえとした","とつぜん、上下がさかさまに。",B=>{
+  B.d(29,1); B.init={}; B.t({z:[8,1,9,14]},["grav"]);
+});
+Lv(7,"あれ？","左右がぎゃくになったら、ぎゃくに押そう。",B=>{
+  B.r(14,15,17,17,"."); gSp(B,21,1); gSp(B,25,1); B.t({z:[6,1,7,14]},["ctl"],["msg","あれ？"]);
+});
+Lv(7,"くるくる","床の穴と、天井の穴。どちら側にいるかが大事。",B=>{
+  B.d(29,14); B.r(12,15,14,17,"."); B.r(20,0,22,0,"."); B.t({z:[7,1,8,14]},["grav"]); B.t({z:[17,1,18,14]},["grav"]);
+});
+Lv(7,"さかさ画面","画面だけが、さかさま。じっくり見よう。",B=>{
+  B.t({z:[6,1,7,14]},["flip"]); gSp(B,10,1); gSp(B,14,1); gSp(B,18,1); B.r(21,15,23,17,"."); gSp(B,26,1);
+});
+Lv(7,"ぜんぶさかさ","画面も、重力も、左右も。",B=>{
+  B.t({z:[5,1,6,14]},["flip"],["ctl"]); B.t({z:[14,1,15,14]},["grav"]); B.t({z:[22,1,23,14]},["grav"]);
+  gSp(B,9,1); B.r(11,15,12,17,".");
+});
+
+/* ---- ワールド8: くらやみ ---- */
+Lv(8,"くらがり","まわりしか見えない。足元に注意。",B=>{
+  B.init={dark:true}; gSp(B,8,1); gSp(B,13,1); gSp(B,17,2); gSp(B,23,1); B.r(26,15,27,17,".");
+});
+Lv(8,"きょだい","からだが大きくなった。",B=>{
+  B.t({z:[5,1,6,14]},["scale",1.7]); gSp(B,10,1); gSp(B,16,1); B.r(20,12,23,13); B.r(24,15,25,17,".");
+});
+Lv(8,"ちいさく","小さくなれば、せまい道も通れる。",B=>{
+  B.t({z:[7,1,8,14]},["scale",.5]); B.def("a",{k:"block",oy:15}); B.r(13,13,19,13,"a"); B.r(13,14,19,14,"#");
+  B.r(13,14,19,14,"."); B.r(13,14,19,14,"."); B.t({z:[22,1,23,14]},["scale",1]); gSp(B,26,1);
+});
+Lv(8,"ちかちか","明かりが消えたり、ついたり。",B=>{
+  B.init={dark:true}; B.t({e:[0,70]},["dark",false]); B.t({e:[40,70]},["dark",true]);
+  gSp(B,9,1); gSp(B,14,2); B.r(18,15,19,17,"."); gSp(B,23,1);
+});
+Lv(8,"やみのボス","暗やみ、巨大化、天井のトゲ。",B=>{
+  B.init={dark:true}; gCeil(B,10,"a"); gCeil(B,17,"b"); B.t({z:[12,1,13,14]},["scale",1.5]); B.t({z:[20,1,21,14]},["scale",1]); gSp(B,24,1); B.r(26,15,27,17,".");
+});
+
+/* ---- ワールド9: こおり ---- */
+Lv(9,"つるつる","床がこおっている。すべる！",B=>{
+  B.init={ice:true}; B.r(12,15,14,17,"."); gSp(B,22,1);
+});
+Lv(9,"かぜ","うしろから、強い風。",B=>{
+  B.init={wind:1.3}; B.r(13,15,16,17,"."); gSp(B,24,1);
+});
+Lv(9,"スイッチ","ふんだらカベが開く。でも、足元が……。",B=>{
+  B.def("a",{k:"block"}); B.r(15,15,16,17,"a"); B.def("b",{k:"block",col:"pad"}); B.r(15,14,16,14,"b");
+  B.def("g",{k:"block"}); B.r(22,8,22,14,"g");
+  B.t({on:"b"},["hide","g"]); B.t({on:"b",dl:25},["fall","a"],["fall","b"]);
+});
+Lv(9,"こおり＋かぜ","すべる床に、風がふく。",B=>{
+  B.init={ice:true,wind:-.9}; B.r(10,15,12,17,"."); B.r(18,15,20,17,"."); gSp(B,15,1);
+});
+Lv(9,"ふたつのスイッチ","スイッチは、ふたつ。",B=>{
+  B.def("a",{k:"block"}); B.r(8,15,9,17,"a"); B.def("b",{k:"block",col:"pad"}); B.r(8,14,9,14,"b"); B.def("g",{k:"block"}); B.r(14,8,14,14,"g");
+  B.def("c",{k:"block"}); B.r(18,15,19,17,"c"); B.def("d",{k:"block",col:"pad"}); B.r(18,14,19,14,"d"); B.def("h",{k:"block"}); B.r(24,8,24,14,"h");
+  B.t({on:"b"},["hide","g"]); B.t({on:"b",dl:25},["fall","a"],["fall","b"]);
+  B.t({on:"d"},["hide","h"]); B.t({on:"d",dl:25},["fall","c"],["fall","d"]);
+});
+
+/* ---- ワールド10: さいご ---- */
+Lv(10,"ふりだし","ここまでの、おさらい。",B=>{
+  gHole(B,8,2,"a"); gCeil(B,14,"b"); gPop(B,19,2,"c",16); B.r(23,15,25,17,"."); B.t({z:[21,1,22,14]},["hide","c"]);
+});
+Lv(10,"うごいて、ふって","動く足場とプレスとトゲ。",B=>{
+  B.r(7,15,12,17,"."); B.def("a",{k:"block",osc:[4,0,190]}); B.r(7,15,8,15,"a");
+  B.def("b",{k:"block",haz:true,osc:[0,12,150]}); B.r(17,1,18,2,"b"); gCeil(B,23,"c");
+});
+Lv(10,"カギと重力","カギをとって、天井のドアへ。",B=>{
+  B.d(29,1); B.p(14,14,"K"); B.t({get:"K"},["grav"]); B.r(18,15,20,17,"."); gSp(B,24,1);
+});
+Lv(10,"やみとぎゃく","暗やみで、左右ぎゃく。",B=>{
+  B.init={dark:true}; B.t({z:[6,1,7,14]},["ctl"]); gSp(B,10,1); gSp(B,15,1); B.r(19,15,20,17,"."); gSp(B,24,1);
+});
+Lv(10,"トラップ レベル","ぜんぶの罠が、ここに。",B=>{
+  B.p(8,14,"F"); gHole(B,12,2,"a"); gCeil(B,17,"b"); B.p(22,14,"F"); B.t({z:[17,1,18,14]},["slide","F",-3.5,0]);
+  B.def("c",{k:"block",haz:true,vis:false}); B.r(2,1,2,14,"c"); B.t({z:[19,1,20,14]},["show","c"],["slide","c",1.5,0]);
+});
+
+/* ================= 描画 ================= */
+const cv=$("#cv"),ctx=cv.getContext("2d");
+let K=1,L=null,S=null;
+const FX={parts:[],flash:0};
+function fit(){
+  const s=Math.min(innerWidth/W,innerHeight/H); cv.style.width=W*s+"px"; cv.style.height=H*s+"px";
+  const dpr=Math.min(window.devicePixelRatio||1,2); cv.width=Math.round(W*s*dpr); cv.height=Math.round(H*s*dpr); K=cv.width/W;
+}
+function rr(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+function wallCell(c,x,y,wd,top,haz){
+  c.fillStyle=haz?"#3b1a26":wd.wall; c.fillRect(x,y,TS,TS);
+  c.fillStyle="rgba(255,255,255,.10)"; if(top) c.fillRect(x,y,TS,4);
+  c.fillStyle="rgba(0,0,0,.25)"; c.fillRect(x,y+TS-3,TS,3);
+}
+function spikeCell(c,x,y,d){
+  c.save(); c.translate(x+15,y+15); if(d==="d")c.rotate(Math.PI); else if(d==="l")c.rotate(-Math.PI/2); else if(d==="r")c.rotate(Math.PI/2);
+  c.fillStyle="#f4efe6"; c.strokeStyle="#15121b"; c.lineWidth=2.2; c.lineJoin="round";
+  for(let i=0;i<2;i++){ const bx=-15+i*15; c.beginPath(); c.moveTo(bx+.5,15); c.lineTo(bx+7.5,-9); c.lineTo(bx+14.5,15); c.closePath(); c.fill(); c.stroke(); }
+  c.restore();
+}
+function doorCell(c,x,y,fake,wd,locked){
+  const bx=x+3,by=y-14,w=24,h=44;
+  c.fillStyle="#5a3416"; rr(c,bx-2,by-2,w+4,h+2,6); c.fill();
+  c.fillStyle=locked?"#7a5a2a":"#b97a3c"; rr(c,bx,by,w,h,5); c.fill();
+  c.fillStyle="rgba(0,0,0,.18)"; c.fillRect(bx+w/2-1,by+4,2,h-8);
+  c.fillStyle="#ffd96a"; c.beginPath(); c.arc(bx+w-6,by+h*.55,2.6,0,7); c.fill();
+}
+function keyCell(c,x,y,t){
+  const bob=Math.sin(t/14)*2; c.save(); c.translate(x+15,y+15+bob); c.strokeStyle="#15121b"; c.lineWidth=2; c.fillStyle="#ffd24a";
+  c.beginPath(); c.arc(-5,-3,6,0,7); c.fill(); c.stroke(); c.fillStyle="#15121b"; c.beginPath(); c.arc(-5,-3,2,0,7); c.fill();
+  c.fillStyle="#ffd24a"; c.fillRect(0,-5,13,4); c.strokeRect(0,-5,13,4); c.fillRect(8,-1,3,5); c.strokeRect(8,-1,3,5); c.restore();
+}
+function coinCell(c,x,y,t){
+  const bob=Math.sin(t/12+x)*2; c.save(); c.translate(x+15,y+15+bob); c.fillStyle="#ffd24a"; c.strokeStyle="#15121b"; c.lineWidth=2;
+  c.beginPath(); c.arc(0,0,8.5,0,7); c.fill(); c.stroke(); c.strokeStyle="#c78f12"; c.beginPath(); c.arc(0,0,4.5,0,7); c.stroke(); c.restore();
+}
+function springCell(c,x,y,an){
+  const sq=an>0?.55:1; c.save(); c.translate(x+15,y+30); c.scale(1,sq); c.strokeStyle="#f4efe6"; c.lineWidth=3; c.lineJoin="round";
+  c.beginPath(); c.moveTo(-9,-2); for(let i=0;i<4;i++){ c.lineTo(9,-6-i*5+2.5); c.lineTo(-9,-8-i*5); } c.stroke();
+  c.fillStyle="#e8443a"; c.strokeStyle="#15121b"; c.lineWidth=2; c.fillRect(-12,-28,24,6); c.strokeRect(-12,-28,24,6); c.restore();
+}
+function draw(){
+  const c=ctx; c.setTransform(K,0,0,K,0,0); const wd=WORLDS[L.w-1];
+  c.fillStyle=wd.bg; c.fillRect(0,0,W,H);
+  c.fillStyle="rgba(255,255,255,.05)"; for(let x=0;x<W;x+=90) c.fillRect(x,0,45,H);
+  c.save();
+  let sx=0,sy=0; if(S.shk>0&&SET.shk){ sx=(Math.random()-.5)*5; sy=(Math.random()-.5)*5; }
+  if(S.flip){ c.translate(sx,H+sy); c.scale(1,-1); } else c.translate(sx,sy);
+  for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){ const s=L.solid[y*GW+x]; if(!s) continue;
+    if(s===2){ c.fillStyle="#bfe9ff"; c.fillRect(x*TS,y*TS,TS,TS); c.fillStyle="rgba(255,255,255,.55)"; c.fillRect(x*TS,y*TS,TS,4); }
+    else wallCell(c,x*TS,y*TS,wd,y===0||!L.solid[(y-1)*GW+x],false); }
+  for(const ch of L.gl){ const G=L.G[ch],g=S.g[ch]; if(!g.vis) continue;
+    for(const cl of G.cells){ const x=cl[0]*TS+g.ox,y=cl[1]*TS+g.oy; if(y>H+40||x<-40||x>W+40) continue;
+      if(G.k==="block"){ if(G.col==="pad"){ c.fillStyle=wd.ac; c.fillRect(x,y,TS,TS); c.fillStyle="rgba(0,0,0,.25)"; c.fillRect(x,y+TS-4,TS,4); c.fillStyle="rgba(0,0,0,.3)"; c.fillRect(x+6,y+6,TS-12,4); } else wallCell(c,x,y,wd,!(G.set.has(cl[0]+","+(cl[1]-1))||(cl[1]>0&&L.solid[(cl[1]-1)*GW+cl[0]]===1)),g.haz); }
+      else if(G.k==="spike") spikeCell(c,x,y,G.d);
+      else if(G.k==="door") doorCell(c,x,y,G.fake,wd,L.needKey&&!S.key);
+      else if(G.k==="key") keyCell(c,x,y,S.f);
+      else if(G.k==="coin") coinCell(c,x,y,S.f);
+      else if(G.k==="spring") springCell(c,x,y,g.anim); } }
+  // 死亡のかけら
+  c.fillStyle="#15121b"; for(const q of FX.parts){ c.fillRect(q.x,q.y,q.s,q.s); }
+  if(S.st!=="dead") drawPlayer(c);
+  c.restore();
+  if(S.dark){ const p=S.p; const px=p.x+p.w/2,py=S.flip?H-(p.y+p.h/2):p.y+p.h/2; const g=c.createRadialGradient(px,py,40,px,py,150); g.addColorStop(0,"rgba(8,6,14,0)"); g.addColorStop(1,"rgba(8,6,14,.97)"); c.fillStyle=g; c.fillRect(0,0,W,H); }
+  if(S.mt>0&&S.msg){ c.font="900 26px "+getComputedStyle(document.body).fontFamily; c.textAlign="center"; c.lineWidth=6; c.strokeStyle="rgba(20,18,26,.9)"; c.strokeText(S.msg,W/2,110); c.fillStyle="#fff"; c.fillText(S.msg,W/2,110); }
+  if(FX.flash>0){ c.fillStyle="rgba(255,255,255,"+FX.flash*.06+")"; c.fillRect(0,0,W,H); }
+}
+function drawPlayer(c){
+  const p=S.p,cx=p.x+p.w/2,cy=p.y+p.h/2; c.save(); c.translate(cx,cy); if(p.g<0) c.scale(1,-1);
+  const w=p.w,h=p.h,walk=Math.abs(p.vx)>.5&&p.on?((S.f>>2)&1):0;
+  c.fillStyle="#15121b"; rr(c,-w/2,-h/2,w,h-3*S.k,6*S.k); c.fill();
+  c.fillRect(-w/2+2*S.k,h/2-6*S.k,6*S.k,5*S.k+(walk?0:2*S.k)); c.fillRect(w/2-8*S.k,h/2-6*S.k,6*S.k,5*S.k+(walk?2*S.k:0));
+  const f=p.face; c.fillStyle="#fff"; for(const ex of [-4,4]){ c.beginPath(); c.ellipse(ex*S.k+f*1.5*S.k,-h*.18,3.4*S.k,4.2*S.k,0,0,7); c.fill(); }
+  c.fillStyle="#15121b"; for(const ex of [-4,4]){ c.beginPath(); c.arc(ex*S.k+f*2.6*S.k,-h*.16,1.7*S.k,0,7); c.fill(); }
+  c.restore();
+}
+
+/* ================= 進行 ================= */
+let SAVE=store.get("tl_save",{clear:{},deaths:0});
+const G={screen:"title",li:0,lvDeaths:0,tot:SAVE.deaths||0,winT:0,deadT:0,back:"title",world:1};
+function saveAll(){ store.set("tl_save",SAVE); }
+function updHUD(){ $("#hLv").innerHTML=`${L.w}-${(L.i%5)+1}<small>${L.n}</small>`; $("#hMs").textContent=`ミス ${G.lvDeaths}（合計 ${G.tot}）`;
+  $("#hHint").style.display=G.lvDeaths>=5?"":"none"; $("#hSkip").style.display=G.lvDeaths>=12?"":"none"; }
+function startLevel(i){
+  G.li=i; L=build(i); S=newState(L); FX.parts=[]; G.winT=0; G.deadT=0; G.lvDeaths=0; $("#hintBar").classList.remove("on");
+  showScreen(null); $("#hud").classList.add("on"); updHUD(); G.screen="play"; audio(); applyTouch();
+}
+function restart(){ L=build(G.li); S=newState(L); FX.parts=[]; G.deadT=0; G.winT=0; updHUD(); }
+function onDie(){
+  G.lvDeaths++; G.tot++; SAVE.deaths=G.tot; saveAll(); SE.die(); G.deadT=26; const p=S.p;
+  for(let i=0;i<22;i++){ const a=Math.random()*6.28,v=1.5+Math.random()*4.5; FX.parts.push({x:p.x+p.w/2,y:p.y+p.h/2,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,s:3+Math.random()*5}); }
+  updHUD();
+}
+function onWin(){
+  const k=G.li; const o=SAVE.clear[k]; if(!o||(o.sk&&!o.skAfter)){} SAVE.clear[k]={d:Math.min(o?o.d:1e9,G.lvDeaths),sk:0}; saveAll(); SE.win(); G.winT=40; FX.flash=8;
+}
+function afterWin(){
+  const i=G.li; if(i===49){ showEnding(); return; }
+  if((i+1)%5===0){ banner(`ワールド${L.w}　クリア！`); go("worlds"); return; }
+  startLevel(i+1);
+}
+let bT=0; function banner(t){ const b=$("#banner"); b.textContent=t; b.classList.add("on"); clearTimeout(bT); bT=setTimeout(()=>b.classList.remove("on"),1800); }
+function showEnding(){ $("#endTxt").innerHTML=`50ステージ、ぜんぶの罠をくぐりぬけた。<br>ミスの合計：${G.tot}回<br>ここまで遊んでくれて、ありがとう！`; $("#hud").classList.remove("on"); showScreen("ending"); G.screen="ending"; }
+
+/* ---- 入力 ---- */
+const KB={l:false,r:false,j:false},TB={l:false,r:false,j:false};
+let GP={l:false,r:false,j:false};
+function pollPad(){ GP.l=GP.r=GP.j=false; try{ const pads=navigator.getGamepads?navigator.getGamepads():[]; for(const p of pads){ if(!p) continue; const ax=p.axes[0]||0; if(ax<-.4||(p.buttons[14]&&p.buttons[14].pressed)) GP.l=true; if(ax>.4||(p.buttons[15]&&p.buttons[15].pressed)) GP.r=true; if([0,1,2,3,12].some(i=>p.buttons[i]&&p.buttons[i].pressed)) GP.j=true; } }catch(e){} }
+const keyMap={ArrowLeft:"l",KeyA:"l",ArrowRight:"r",KeyD:"r",ArrowUp:"j",KeyW:"j",Space:"j",KeyZ:"j"};
+addEventListener("keydown",e=>{ const m=keyMap[e.code]; if(m){ KB[m]=true; e.preventDefault(); audio(); }
+  if(G.screen==="play"){ if(e.code==="KeyR"){ restart(); } if(e.code==="Escape"){ go("worlds"); } if(G.deadT>0&&(m||e.code==="Enter")) { G.deadT=1; } } });
+addEventListener("keyup",e=>{ const m=keyMap[e.code]; if(m) KB[m]=false; });
+addEventListener("blur",()=>{ KB.l=KB.r=KB.j=false; });
+[["bL","l"],["bR","r"],["bJ","j"]].forEach(([id,k])=>{ const b=$("#"+id);
+  const on=e=>{ e.preventDefault(); TB[k]=true; b.classList.add("on"); audio(); try{b.setPointerCapture(e.pointerId)}catch(_){} };
+  const off=e=>{ e.preventDefault(); TB[k]=false; b.classList.remove("on"); };
+  b.addEventListener("pointerdown",on); b.addEventListener("pointerup",off); b.addEventListener("pointercancel",off); b.addEventListener("lostpointercapture",off); b.addEventListener("contextmenu",e=>e.preventDefault()); });
+function getInp(){ return {l:KB.l||TB.l||GP.l,r:KB.r||TB.r||GP.r,j:KB.j||TB.j||GP.j}; }
+function applyTouch(){ const isT=SET.touch===null?(("ontouchstart" in window)||navigator.maxTouchPoints>0):SET.touch; $("#touch").classList.toggle("on",G.screen==="play"&&isT); }
+
+/* ---- 画面 ---- */
+function showScreen(id){ document.querySelectorAll(".screen").forEach(e=>e.classList.remove("on")); if(id) $("#"+id).classList.add("on"); }
+function go(id){ G.screen=id; if(id!=="play"){ $("#hud").classList.remove("on"); $("#hintBar").classList.remove("on"); } showScreen(id); applyTouch();
+  if(id==="worlds") buildWorlds(); if(id==="title") buildTitle(); if(id==="settings") buildSettings(); }
+const doorSvg=c=>`<svg viewBox="0 0 54 72"><rect x="5" y="3" width="44" height="66" rx="9" fill="rgba(0,0,0,.35)"/><rect x="9" y="7" width="36" height="62" rx="7" fill="${c}"/><rect x="26" y="12" width="2" height="52" fill="rgba(0,0,0,.2)"/><circle cx="39" cy="40" r="3" fill="#ffd96a"/></svg>`;
+function clearedIn(w){ let n=0; for(let k=0;k<5;k++) if(SAVE.clear[(w-1)*5+k]) n++; return n; }
+function nextLevel(){ for(let i=0;i<50;i++) if(!SAVE.clear[i]) return i; return 0; }
+function buildTitle(){ const n=Object.keys(SAVE.clear).length; $("#bPlay").textContent=n>0&&n<50?"つづきから":"あそぶ"; $("#spk").innerHTML=Array.from({length:9},()=>`<svg viewBox="0 0 40 26"><path d="M2 26L12 3l8 23zM20 26L30 3l8 23z"/></svg>`).join(""); }
+function buildWorlds(){
+  const n=Object.keys(SAVE.clear).length; $("#wSub").textContent=`クリア ${n} / 50　　ミスの合計 ${G.tot}`;
+  $("#wgrid").innerHTML=WORLDS.map((w,i)=>{ const dots=Array.from({length:5},(_,k)=>{ const o=SAVE.clear[i*5+k]; return `<u class="${o?(o.sk?"s":"d"):""}"></u>`; }).join(""); return `<button class="wc" data-w="${i+1}" style="background:${w.bg}">${doorSvg(w.wall)}<b>${i+1}. ${w.n}</b><i>${clearedIn(i+1)} / 5</i><div class="dots">${dots}</div></button>`; }).join("");
+  $("#wgrid").querySelectorAll(".wc").forEach(b=>b.addEventListener("click",()=>{ audio(); buildStages(+b.dataset.w); go("stages"); }));
+}
+function buildStages(w){ G.world=w; $("#sTitle").textContent=`ワールド${w}　${WORLDS[w-1].n}`; $("#sSub").textContent="ステージをえらぶ";
+  $("#stl").innerHTML=Array.from({length:5},(_,k)=>{ const i=(w-1)*5+k,o=SAVE.clear[i]; return `<button class="st ${o?"done":""}" data-i="${i}"><em>${w}-${k+1}</em><span>${LV[i].n}</span><small>${o?(o.sk?"スキップ":"クリア（最少ミス "+o.d+"）"):""}</small></button>`; }).join("");
+  $("#stl").querySelectorAll(".st").forEach(b=>b.addEventListener("click",()=>{ audio(); startLevel(+b.dataset.i); })); }
+function buildSettings(){ $("#tSndV").textContent=SET.snd?"ON":"OFF"; $("#tSndV").className=SET.snd?"":"off"; $("#tShkV").textContent=SET.shk?"ON":"OFF"; $("#tShkV").className=SET.shk?"":"off";
+  const t=SET.touch===null?"じどう":SET.touch?"ON":"OFF"; $("#tTouchV").textContent=t; $("#tTouchV").className=SET.touch===false?"off":""; }
+let rstArm=0;
+$("#bPlay").addEventListener("click",()=>{ audio(); startLevel(nextLevel()); });
+$("#bWorlds").addEventListener("click",()=>{ audio(); go("worlds"); });
+$("#bSet").addEventListener("click",()=>{ audio(); G.back="title"; go("settings"); });
+$("#wBack").addEventListener("click",()=>go("title"));
+$("#sBack").addEventListener("click",()=>go("worlds"));
+$("#setBack").addEventListener("click",()=>go(G.back==="play"?"worlds":"title"));
+$("#endBack").addEventListener("click",()=>go("worlds"));
+$("#tSnd").addEventListener("click",()=>{ SET.snd=!SET.snd; store.set("tl_set",SET); buildSettings(); audio(); });
+$("#tShk").addEventListener("click",()=>{ SET.shk=!SET.shk; store.set("tl_set",SET); buildSettings(); });
+$("#tTouch").addEventListener("click",()=>{ SET.touch=SET.touch===null?true:SET.touch===true?false:null; store.set("tl_set",SET); buildSettings(); });
+$("#tReset").addEventListener("click",()=>{ if(rstArm){ SAVE={clear:{},deaths:0}; G.tot=0; saveAll(); rstArm=0; $("#tResetV").textContent="消した"; } else { rstArm=1; $("#tResetV").textContent="もう一度タップで消す"; setTimeout(()=>{ rstArm=0; $("#tResetV").textContent="消す"; },3000); } });
+$("#hRe").addEventListener("click",()=>{ if(G.screen==="play") restart(); });
+$("#hMenu").addEventListener("click",()=>{ go("worlds"); });
+$("#hHint").addEventListener("click",()=>{ const b=$("#hintBar"); b.textContent="ヒント：　"+L.h; b.classList.toggle("on"); });
+$("#hSkip").addEventListener("click",()=>{ SAVE.clear[G.li]={d:G.lvDeaths,sk:1}; saveAll(); afterWin(); });
+
+/* ---- メインループ ---- */
+let last=performance.now(),acc=0;
+function tick(now){
+  const dt=Math.min(100,now-last); last=now;
+  if(G.screen==="play"&&L){
+    acc+=dt; pollPad();
+    while(acc>=1000/60){ acc-=1000/60; frame(); }
+    draw();
+  } else acc=0;
+  requestAnimationFrame(tick);
+}
+function frame(){
+  if(FX.flash>0) FX.flash--;
+  for(const q of FX.parts){ q.x+=q.vx; q.y+=q.vy; q.vy+=.35; }
+  if(S.st==="win"){ if(--G.winT<=0) afterWin(); return; }
+  if(S.st==="dead"){ if(G.deadT===0){ G.deadT=26; } if(--G.deadT<=0){ restart(); } return; }
+  const sj=S.sj,spr=S.sp,tk=S.tk,pk=S.pk; S.pk=""; step(L,S,getInp());
+  if(S.sj!==sj&&S.sj===S.f) SE.jump(); if(S.sp!==spr&&S.sp===S.f) SE.spring(); if(S.tk!==tk&&S.tk===S.f) SE.tick(); if(S.pk) (S.pk==="key"?SE.key:SE.coin)();
+  if(S.st==="dead") onDie(); else if(S.st==="win") onWin();
+}
+addEventListener("resize",fit); addEventListener("orientationchange",()=>setTimeout(fit,200));
+document.addEventListener("contextmenu",e=>e.preventDefault());
+document.addEventListener("gesturestart",e=>e.preventDefault());
+fit(); buildTitle(); applyTouch(); requestAnimationFrame(tick);
+window.__tl={LV,build,newState,step,TS,GW,GH,W,H,G,startLevel,get S(){return S},get L(){return L}};
+})();
+</script>
+</body>
+</html>
